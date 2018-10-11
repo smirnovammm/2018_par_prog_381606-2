@@ -48,15 +48,15 @@ void FindMax(int* matr, int* arr_max, int columns, int lines)
 
 int main(int argc, char* argv[])
 {
-	MPI_Init(&argc, &argv);                     
-
+	MPI_Init(&argc, &argv);    
+	
+	MPI_Status Status;
+	
 	int lines = atoi(argv[1]);
 	int columns = atoi(argv[2]);	
 
 	int ProcRank, ProcNum;
-
-	MPI_Status Status;
-
+	
 	MPI_Comm_size(MPI_COMM_WORLD, &ProcNum);                                  
 	MPI_Comm_rank(MPI_COMM_WORLD, &ProcRank);                           
 	
