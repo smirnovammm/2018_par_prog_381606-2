@@ -22,12 +22,15 @@ int Sequental_Executing(double *v1, double *v2, int size) {
 int Scalar_Product(int argc, char **argv)
 {
 	double t1, t2, dt;
-	int rank, size, i;
+	int rank, size, i , tmp;
 	double TotalSum = 0, ProcSum = 0;
 	int VecSize;
 	double *v1 = NULL;
 	double *v2 = NULL;
+	double *v11 = NULL;
+	double *v12 = NULL;
 	int Step;
+	int *sendcounts, *displs;
 
 	if (argc > 1) {
 		VecSize = atoi(argv[1]);
@@ -37,16 +40,15 @@ int Scalar_Product(int argc, char **argv)
 	}
 	v1 = new double[VecSize];
 	v2 = new double[VecSize];
+
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+	displs = new int[size];
+	sendcounts = new int[size];
+
 	if (rank == 0) {
-		srand(time(NULL));
-		v1 = new double[2 * VecSize];
-		v2 = v1 + VecSize;
-		v1 = new double[VecSize];
-		v2 = new double[VecSize];
 		for (int i = 0; i < VecSize; i++) {
 			v1[i] = rand() % 10;
 			v2[i] = rand() % 10;
@@ -68,21 +70,59 @@ int Scalar_Product(int argc, char **argv)
 		Sequental_Executing(v1, v2, VecSize);
 
 		t1 = MPI_Wtime();
+
+		Step = VecSize / size;
+		tmp = VecSize % size;
+		sendcounts = new int[size];
+		displs = new int[size];
+		i = rank;
+		for (int i = 0; i < size; i++) {
+			if (tmp != 0) {
+				sendcounts[i] = Step + 1;
+				tmp--;
+			}
+			else {
+				sendcounts[i] = Step;
+			}
+		}
+		displs[0] = 0;
+		for (int i = 1; i < size; i++) {
+			displs[i] = displs[i - 1] + sendcounts[i - 1];
+		}
+		//MPI_Bcast(&tmp, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	}
-	Step = VecSize / size;
-	i = rank;
+	MPI_Bcast(&tmp, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&Step, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(displs, size, MPI_INT, 0, MPI_COMM_WORLD);
 
-	MPI_Bcast(v1, VecSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(v2, VecSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	for (int i = 0; i < size; i++) {
+		if (rank < tmp) {
+			v11 = new double[Step + 1];
+			v12 = new double[Step + 1];
+		}
+		else {
+			v11 = new double[Step];
+			v12 = new double[Step];
+		}
+	}
 
+	//MPI_Bcast(v1, VecSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	//MPI_Bcast(v2, VecSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatterv(v1, sendcounts,  displs, MPI_DOUBLE, v11, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatterv(v2, sendcounts, displs, MPI_DOUBLE, v12, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-	for (int j = Step * i; j < Step * i + Step; j++)
+	for (int i = 0; i < sendcounts[rank]; i++) {
+		ProcSum += v1[i] * v2[i];
+	}
+
+	/*for (int j = Step * i; j < Step * i + Step; j++)
 		ProcSum += v1[j] * v2[j];
 
 	if (size * Step + rank < VecSize) {
 		i = size * Step + rank;
 		ProcSum += v1[i] * v2[i];
-	}
+	}*/
 
 	MPI_Reduce(&ProcSum, &TotalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 	if (rank == 0) { 
@@ -90,8 +130,6 @@ int Scalar_Product(int argc, char **argv)
 		dt = t2 - t1;
 		cout << "The execution time of the parallel program is " << dt << " sec" << endl; 
 	}
-	//delete[] v1;
-	//delete[] v2;
 	MPI_Finalize();
 	delete[] v1;
 	delete[] v2;
