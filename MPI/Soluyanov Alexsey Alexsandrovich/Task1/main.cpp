@@ -7,7 +7,6 @@ double Sequental_Executing(double *v1, double *v2, int size) {
 	for (int i = 0; i < size; i++) {
 		Total_Res += v1[i] * v2[i];
 	}
-	cout << "The result of the scalar product (Sequental_Executing) = " << Total_Res << endl;
 	return Total_Res;
 }
 
@@ -37,6 +36,22 @@ int Scalar_Product(int argc, char **argv)
 
 	displs = new int[size];
 	sendcounts = new int[size];
+	sendcounts = new int[size];
+	displs = new int[size];
+
+	Step = VecSize / size;
+	tmp = VecSize % size;
+	i = rank;
+	for (int i = 0; i < tmp; i++) {
+		sendcounts[i] = Step + 1;
+	}
+	for (int i = tmp; i < size; i++) {
+		sendcounts[i] = Step;
+	}
+	displs[0] = 0;
+	for (int i = 1; i < size; i++) {
+		displs[i] = displs[i - 1] + sendcounts[i - 1];
+	}
 
 	if (rank == 0) {
 		v1 = new double[VecSize];
@@ -66,33 +81,9 @@ int Scalar_Product(int argc, char **argv)
 		dt2 = t4 - t3;
 		cout << "The execution time of the sequental program is " << dt2 << " sec" << endl;
 
-
-		Step = VecSize / size;
-		tmp = VecSize % size;
-		newtmp = VecSize % size;
-		sendcounts = new int[size];
-		displs = new int[size];
-		i = rank;
-		for (int i = 0; i < size; i++) {
-			if (newtmp != 0) {
-				sendcounts[i] = Step + 1;
-				newtmp--;
-			}
-			else {
-				sendcounts[i] = Step;
-			}
-		}
-		displs[0] = 0;
-		for (int i = 1; i < size; i++) {
-			displs[i] = displs[i - 1] + sendcounts[i - 1];
-		}
 		t1 = MPI_Wtime();
 	}
 
-	MPI_Bcast(&tmp, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(&Step, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(displs, size, MPI_INT, 0, MPI_COMM_WORLD);
 
 	if (rank < tmp) {
 		v11 = new double[Step + 1];
