@@ -14,25 +14,26 @@ int main(int argc, char *argv[])
 		int *vec = NULL, *local_vec = NULL;
 		int i;
 		const int root = 0;
+		int rem;
 
 		MPI_Comm_size(MPI_COMM_WORLD, &proc_count);
 		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+		rem = global_size % proc_count;
 
 		if (rank == root)
 		{
-			int rem;
-
-			global_size = VECTOR_SIZE;
+			if (argc > 1)
+			{
+				global_size = atoi(argv[1]);
+			}
+			else
+			{
+				global_size = 20;
+			}
 
 			vec = (int *)malloc(global_size * sizeof(int));
 			//srand(time(NULL));
 			randomize_vector(vec, global_size);
-
-			rem = global_size % proc_count;
-			if (rem != 0)
-			{
-				vec = complete_vector(vec, &global_size, proc_count, rem);
-			}
 
 			print_vector(vec, global_size);
 			printf("\n");
@@ -43,18 +44,7 @@ int main(int argc, char *argv[])
 		local_size = global_size / proc_count;
 		local_vec = (int *)malloc(local_size * sizeof(int));
 
-		if (rank == root)
-		{
-			local_vec = vec;
-			for (i = 1; i < proc_count; i++)
-			{
-				MPI_Send(&vec[local_size * i], local_size, MPI_INT, i, 0, MPI_COMM_WORLD);
-			}
-		}
-		else
-		{
-			MPI_Recv(local_vec , local_size, MPI_INT, root, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		}
+		MPI_Scatter(vec, local_size, MPI_INT, local_vec, local_size, MPI_INT, root, MPI_COMM_WORLD);
 
 		local_max = maximum(local_vec, local_size);
 		MPI_Reduce(&local_max, &global_max, 1, MPI_INT, MPI_MAX, root, MPI_COMM_WORLD);
