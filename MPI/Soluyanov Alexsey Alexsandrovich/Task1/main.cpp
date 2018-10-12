@@ -14,7 +14,7 @@ double Sequental_Executing(double *v1, double *v2, int size) {
 int Scalar_Product(int argc, char **argv)
 {
 	double t1, t2, dt, t3, t4, dt2, Saq_Res;
-	int rank, size, i , tmp;
+	int rank, size, i , tmp, newtmp;
 	double TotalSum = 0, ProcSum = 0;
 	int VecSize;
 	double *v1 = NULL;
@@ -69,13 +69,14 @@ int Scalar_Product(int argc, char **argv)
 
 		Step = VecSize / size;
 		tmp = VecSize % size;
+		newtmp = VecSize % size;
 		sendcounts = new int[size];
 		displs = new int[size];
 		i = rank;
 		for (int i = 0; i < size; i++) {
-			if (tmp != 0) {
+			if (newtmp != 0) {
 				sendcounts[i] = Step + 1;
-				tmp--;
+				newtmp--;
 			}
 			else {
 				sendcounts[i] = Step;
@@ -92,7 +93,6 @@ int Scalar_Product(int argc, char **argv)
 	MPI_Bcast(&Step, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(displs, size, MPI_INT, 0, MPI_COMM_WORLD);
-
 
 	if (rank < tmp) {
 		v11 = new double[Step + 1];
