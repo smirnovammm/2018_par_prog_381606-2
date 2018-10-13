@@ -2,27 +2,18 @@
 #include<iostream>
 #include <ctime>
 using namespace std;
-int Sequental_Executing(double *v1, double *v2, int size) {
-	clock_t start_time;
-	clock_t end_time;
-	clock_t total_time;
-	int i = 0;
-	start_time = clock();
+double Sequental_Executing(double *v1, double *v2, int size) {
 	double Total_Res = 0;
 	for (int i = 0; i < size; i++) {
 		Total_Res += v1[i] * v2[i];
 	}
-	end_time = clock();
-	total_time = end_time - start_time;
-	cout << "The result of the scalar product = " << Total_Res << endl;
-	cout << "Sequental time is " << double(total_time) / double(CLOCKS_PER_SEC) << " sec"  << endl;
-	return 0;
+	return Total_Res;
 }
 
 int Scalar_Product(int argc, char **argv)
 {
-	double t1, t2, dt;
-	int rank, size, i , tmp;
+	double t1, t2, dt, t3, t4, dt2, Saq_Res;
+	int rank, size, i , tmp, newtmp;
 	double TotalSum = 0, ProcSum = 0;
 	int VecSize;
 	double *v1 = NULL;
@@ -38,8 +29,6 @@ int Scalar_Product(int argc, char **argv)
 	else {
 		VecSize = 10;
 	}
-	v1 = new double[VecSize];
-	v2 = new double[VecSize];
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -47,8 +36,26 @@ int Scalar_Product(int argc, char **argv)
 
 	displs = new int[size];
 	sendcounts = new int[size];
+	sendcounts = new int[size];
+	displs = new int[size];
+
+	Step = VecSize / size;
+	tmp = VecSize % size;
+	i = rank;
+	for (int i = 0; i < tmp; i++) {
+		sendcounts[i] = Step + 1;
+	}
+	for (int i = tmp; i < size; i++) {
+		sendcounts[i] = Step;
+	}
+	displs[0] = 0;
+	for (int i = 1; i < size; i++) {
+		displs[i] = displs[i - 1] + sendcounts[i - 1];
+	}
 
 	if (rank == 0) {
+		v1 = new double[VecSize];
+		v2 = new double[VecSize];
 		for (int i = 0; i < VecSize; i++) {
 			v1[i] = rand() % 10;
 			v2[i] = rand() % 10;
@@ -67,44 +74,24 @@ int Scalar_Product(int argc, char **argv)
 			cout << ") " << endl;
 		}
 
-		Sequental_Executing(v1, v2, VecSize);
+
+		t3 = MPI_Wtime();
+		Saq_Res = Sequental_Executing(v1, v2, VecSize);
+		t4 = MPI_Wtime();
+		dt2 = t4 - t3;
+		cout << "The execution time of the sequental program is " << dt2 << " sec" << endl;
 
 		t1 = MPI_Wtime();
-
-		Step = VecSize / size;
-		tmp = VecSize % size;
-		sendcounts = new int[size];
-		displs = new int[size];
-		i = rank;
-		for (int i = 0; i < size; i++) {
-			if (tmp != 0) {
-				sendcounts[i] = Step + 1;
-				tmp--;
-			}
-			else {
-				sendcounts[i] = Step;
-			}
-		}
-		displs[0] = 0;
-		for (int i = 1; i < size; i++) {
-			displs[i] = displs[i - 1] + sendcounts[i - 1];
-		}
-		//MPI_Bcast(&tmp, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	}
-	MPI_Bcast(&tmp, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(&Step, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(displs, size, MPI_INT, 0, MPI_COMM_WORLD);
 
-	for (int i = 0; i < size; i++) {
-		if (rank < tmp) {
-			v11 = new double[Step + 1];
-			v12 = new double[Step + 1];
-		}
-		else {
-			v11 = new double[Step];
-			v12 = new double[Step];
-		}
+
+	if (rank < tmp) {
+		v11 = new double[Step + 1];
+		v12 = new double[Step + 1];
+	}
+	else {
+		v11 = new double[Step];
+		v12 = new double[Step];
 	}
 
 	//MPI_Bcast(v1, VecSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -113,7 +100,7 @@ int Scalar_Product(int argc, char **argv)
 	MPI_Scatterv(v2, sendcounts, displs, MPI_DOUBLE, v12, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	for (int i = 0; i < sendcounts[rank]; i++) {
-		ProcSum += v1[i] * v2[i];
+		ProcSum += v11[i] * v12[i];
 	}
 
 	/*for (int j = Step * i; j < Step * i + Step; j++)
@@ -123,9 +110,14 @@ int Scalar_Product(int argc, char **argv)
 		i = size * Step + rank;
 		ProcSum += v1[i] * v2[i];
 	}*/
-
+	
 	MPI_Reduce(&ProcSum, &TotalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
 	if (rank == 0) { 
+		cout << endl << "TOTAL SUM (Parallel Programm) = " << TotalSum << endl;
+		if (TotalSum == Saq_Res) {
+			cout << "The results of the sequential and parallel algorithms are the same. The decision is correct." << endl;
+		}
 		t2 = MPI_Wtime();
 		dt = t2 - t1;
 		cout << "The execution time of the parallel program is " << dt << " sec" << endl; 
