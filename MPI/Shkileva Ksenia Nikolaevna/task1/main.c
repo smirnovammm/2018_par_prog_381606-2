@@ -22,7 +22,7 @@ void PrintMatrix(int* matrix, int columns, int lines)
 	{
 		for(int j = 0; j < columns; j++)
 		{
-			std::cout << matrix[i + j * lines] << "\t";
+			std::cout <<matrix[columns * i + j] << "\t";
 		}
 		std::cout << std::endl;
 	}
@@ -50,8 +50,6 @@ int main(int argc, char* argv[])
 {
 	MPI_Init(&argc, &argv);    
 	
-	MPI_Status Status;
-	
 	int lines = atoi(argv[1]);
 	int columns = atoi(argv[2]);	
 
@@ -60,56 +58,63 @@ int main(int argc, char* argv[])
 	MPI_Comm_size(MPI_COMM_WORLD, &ProcNum);                                  
 	MPI_Comm_rank(MPI_COMM_WORLD, &ProcRank);                           
 	
-	int block = columns / ProcNum;                                
-	int* matrix = new int[columns*lines];        
-	int* matrix_tmp = new int[block*lines];  
-	int* max_par = new int[columns];                                                         
-	int* max_tmp_vec = new int[block]; 
+	int block = lines / ProcNum; 
+	int remain = lines % ProcNum; 
+
+	int* matrix = nullptr;	
+	int* result = nullptr;
+	int* sizes = nullptr;
+	int* offset = nullptr; 
+	int* max = new int[columns];
 
 	if (ProcRank == 0) 
 	{
+		matrix = new int[lines * columns];
+
 		CreateMatrix(matrix, columns, lines);
 		PrintMatrix(matrix, columns, lines);
 
-		//Parallel algorithm:
+		sizes = new int[ProcNum];
+		offset = new int[ProcNum];
+		result = new int[columns];
 
-		for (int i = 0; i < ProcNum - 1; i++)
+		for(int i = 0; i < ProcNum; i++)
 		{
-			matrix_tmp = matrix + i * block * lines;
-			MPI_Send(matrix_tmp, block*lines, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
+			sizes[i] = block * columns;
+			offset[i] = i * block * columns;
 		}
-		for (int j = 1; j < ProcNum; j++)
-		{
-			MPI_Recv(max_tmp_vec, block, MPI_INT, j, 0, MPI_COMM_WORLD, &Status);
-			for (int i = 0; i < block; i++)
-			{
-				max_par[((j - 1) * block + i)] = max_tmp_vec[i];
-			}
-		}
-		int max = 0;
-		for (int i = ((ProcNum-1) * block); i < columns; i++)	//the last process takes on a remain
-		{
-			for (int j = 0; j < lines ; j++)
-			{
-				if (matrix[i * lines + j] > max)
-					max = matrix[i * lines + j];
-			}
-			max_par[i] = max;
-			max = 0;
-		}
-		std::cout << "Maximum element (parallel algorithm): " << std::endl;
-		for (int i = 0; i < columns; i++)
-		{
-			std::cout<< max_par[i] << "\t";
-		}
-		std::cout << std::endl;
+		sizes[ProcNum - 1] = (block + remain) * columns;
+		offset[ProcNum - 1] = lines * columns - (block + remain) * columns;
 	}
-	else
+
+	int recCount = block * columns;
+	if (ProcRank == ProcNum - 1)
 	{
-		MPI_Recv(matrix_tmp, block * lines, MPI_INT, 0, 0, MPI_COMM_WORLD, &Status);
-		FindMax(matrix_tmp, max_tmp_vec, block, lines);
-		MPI_Send(max_tmp_vec, block, MPI_INT, 0, 0, MPI_COMM_WORLD);
+		recCount = (block + remain) * columns;
 	}
+	int* recBuf = new int[recCount];
+	MPI_Scatterv(matrix, sizes, offset, MPI_INT, recBuf, recCount, MPI_INT, 0, MPI_COMM_WORLD);
+
+	for(int i = 0; i < recCount / columns; i++)
+	{
+		for(int j = 0; j < columns; j++)
+		{
+			max[j] = std::max(max[j], recBuf[i * columns + j]);
+		}
+	}
+
+	MPI_Reduce(max, result, columns, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    	if (ProcRank == 0) 
+	{
+        std::cout << "Maximum element (parallel algorithm): " << std::endl;
+        for (int i = 0; i < columns; i++) 
+		{
+            std::cout << result[i] << "\t";
+        }
+        std::cout << std::endl;
+    	}
+	
 	MPI_Finalize();
 	return 0;
 }
