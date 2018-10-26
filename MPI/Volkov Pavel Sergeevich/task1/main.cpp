@@ -1,3 +1,4 @@
+#include <pch.h>
 #include <mpi.h>
 #include <iostream>
 #include <stdlib.h>
@@ -132,6 +133,36 @@ int main(int argc, char **argv)
 		DWORD etime = GetTickCount();
 		std::cout << "Ansver is " << out << "\n";
 		std::cout << "Time = " << etime - stime << " msc\n";
+
+
+
+
+
+		int check = 0;
+		
+		
+			//clock_t start = clock();
+			
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+				{
+					check += m[i][j];
+				}
+			
+
+		
+			if (check == out)
+			{
+
+				std::cout << "Check is ok\n";
+
+			}
+
+
+
+
+
+
 
 	}
 	else
