@@ -1,6 +1,5 @@
 #include <mpi.h>
 #include <iostream>
-#include <vector>
 #include<time.h>
 using namespace std;
 
@@ -29,13 +28,11 @@ void main(int argv, char* argc[])
 
 	if (procNum == 0)
 	{
-		int addSize;
 		if (!(size_v % procNum))
 		{
 			int tmp, *arr, newSize;
 			tmp = size_v / procNum + 1;
-			addSize = tmp*procNum - size_v;
-			newSize = size_v + addSize;
+			newSize = tmp * procNum;
 			arr = new int[size_v];
 			for (int i = 0; i < size_v; i++)
 				arr[i] = v[i];
